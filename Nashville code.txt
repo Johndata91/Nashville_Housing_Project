@@ -1,0 +1,533 @@
+CREATING THE TABLE TO BE IMPORTED 
+
+CREATE TABLE Nashville_Housing(
+UniqueID INT,	
+ParcelID	CHAR(20),
+LandUse		VARCHAR(100),
+PropertyAddress	VARCHAR(100),
+SaleDate	DATE,
+SalePrice	INT,
+LegalReference CHAR(30),	
+SoldAsVacant	VARCHAR(7),
+OwnerName	VARCHAR(200),
+OwnerAddress VARCHAR(200),	
+Acreage	DECIMAL,
+TaxDistrict	VARCHAR(60),
+LandValue	INT,
+BuildingValue	INT,	
+TotalValue	INT,
+YearBuilt	INT,	
+Bedrooms	INT,	
+FullBath	INT,
+HalfBath	INT
+);
+
+
+
+
+
+
+
+
+Code to import table into table in postgreSQL
+
+COPY Nashville_Housing
+FROM 'C:\Users\USER\Documents\Nashville Housing Project_Mr Shina\Nashville_Housing.csv'
+DELIMITER ','
+CSV HEADER;
+ 
+								SECTION 1 
+SECTION A 
+
+-- EXPLORING PROPERTY VALUES 
+
+--How do the land, building, and total property values vary across different land use categories?
+
+SELECT Landuse,
+ROUND(AVG(landvalue),2) as Avglandvalue,
+ROUND(AVG(buildingvalue),2) as Avgbuildingvalue,
+ROUND(AVG(totalvalue),2) as Avgtotalvalue,
+MIN(landvalue) as Minlandvalue,
+MIN(buildingvalue) as Minbuildingvalue,
+MIN(totalvalue) as Mintotalvalue,
+MAX(landvalue) as Maxlandvalue,
+MAX(buildingvalue) as Maxbuildingvalue,
+MAX(totalvalue) as Maxtotalvalue
+FROM Nashville_housing
+GROUP BY Landuse
+ORDER BY Landuse
+
+
+--Is there any correlation between the acreage of a property and its total value?
+
+SELECT CORR(acreage,totalvalue) as correlation
+from Nashville_housing
+
+--Which tax district has the highest average total property value?
+
+SELECT taxdistrict, ROUND(AVG(totalvalue),2) as Average
+FROM Nashville_housing
+GROUP BY taxdistrict
+ORDER BY Average DESC
+
+
+								SECTION 2 
+
+
+--What is the average sale price of properties sold as vacant versus those not sold as vacant?
+
+SELECT ROUND(AVG(saleprice),2)
+FROM Nashville_Housing
+WHERE soldasvacant = 'Yes'
+
+--Is there a noticeable trend in sale prices over the years?
+
+SELECT EXTRACT(YEAR FROM Saledate) Years, ROUND(avg(saleprice),2) Salesprice
+FROM Nashville_Housing
+GROUP BY Years
+ORDER BY Salesprice DESC
+
+
+--Can you identify any seasonal patterns in the sale dates and prices?
+SELECT EXTRACT(YEAR FROM Saledate) Years,EXTRACT(MONTH FROM Saledate) Months, ROUND(avg(saleprice),2) Salesprice
+FROM Nashville_Housing
+GROUP BY Years,Months
+ORDER BY Months
+
+
+
+								SECTION 3 
+
+SECTION 3 (Ownership Patterns)
+
+
+--Who are the top 10 property owners by the number of properties owned?
+ 
+ SELECT ownername,count(*) Property
+ FROM Nashville_Housing
+ GROUP BY ownername
+ ORDER BY property DESC
+ LIMIT 10
+ 
+ 
+ -- Is there a correlation between the number of properties owned by an owner and their average property value?
+
+
+SELECT CORR(property_count,AVG_Property_Value) AS correlation
+	FROM(
+			SELECT ownername,count(*) as Property_Count,
+			AVG(totalvalue) Avg_Property_value
+			FROM Nashville_Housing
+			GROUP BY Ownername) Ownerstat;
+
+
+--What is the distribution of property owners' addresses by city or region?
+
+SELECT CityorRegion,count(*) as distribution
+FROM(
+	SELECT 
+			CASE
+				WHEN owneraddress LIKE '%TN' THEN 'Nashille'
+				ELSE 'Others'
+				END AS CityorRegion
+				FROM Nashville_Housing) Address_data
+GROUP BY cityorRegion	
+
+
+
+
+							SECTION 4
+
+--Property Characteristics and Values (SECTION 4)
+
+QUESTION 1 
+
+SELECT * FROM Nashville_Housing
+
+-- How does the number of bedrooms relate to the property's total value?
+
+	SELECT ROUND(CAST(CORR(bedrooms,totalvalue)AS NUMERIC), 2) as correlation
+		FROM Nashville_Housing;
+ 
+ ANSWER
+-- This simply indicated a moderate correlation between bedrooms and total value
+-- That is if the number of bedrooms increase total value tend to increase 
+-- On average, properties with more bedrooms tend to be more valuable, 
+ --but the relationship is not strong enough to make bedroom count the sole predictor of a property's value. 
+-- Other factors, such as location, square footage, condition, and amenities, 
+-- may also play significant roles in determining property values."
+
+
+
+QUESTION 2 
+
+--Do properties with more bathrooms tend to have higher sale prices?
+
+	SELECT ROUND(CAST(CORR(fullbath,saleprice)AS NUMERIC), 2) as correlation
+		FROM Nashville_Housing;
+ANSWER
+-- There is a weak positive relationship between the number of full bathrooms in a property and its sale price. 
+--On average, properties with more full bathrooms tend to have slightly higher sale prices, but the influence of the number of full bathrooms on the sale price is not significant. 
+--Other factors, such as location, square footage, condition, and market demand, may have a more substantial impact on property sale prices."
+--The correlation value simply means fullbath is not a strong predictor of sale price.
+
+
+QUESTION 3 
+
+--Is there a relationship between the year built and the total property value?
+
+	SELECT ROUND(CAST(CORR(yearbuilt,totalvalue)AS NUMERIC), 2) as correlation
+		FROM Nashville_Housing;
+		
+ANSWER
+
+--There is a relatively weak positive relationship between the year a property was built and its total value. 
+--On average, newer properties tend to have higher values, but this relationship is not strong, and other factors play a substantial role in determining property values."
+
+
+
+								SECTION 5
+
+
+								
+								QUESTION 1
+--What percentage of properties were sold as vacant?
+
+SELECT
+    (COUNT(DISTINCT CASE WHEN Soldasvacant = 'Yes' THEN uniqueid END) * 100.0 /
+    COUNT(soldasvacant)) AS Percentage_Vacant
+FROM Nashville_housing;
+
+									
+									QUESTION 2
+--Are vacant properties generally priced differently from nonvacant properties?
+		
+	SELECT
+    AVG(CASE WHEN Soldasvacant = 'Yes' THEN totalvalue END) AS Avg_Price_Vacant,
+    AVG(CASE WHEN Soldasvacant = 'No' THEN totalvalue END) AS Avg_Price_NonVacant
+FROM Nashville_housing
+WHERE Soldasvacant IN ('Yes', 'No');
+
+ANSWER 
+
+-- The nonvacant are priced better and vacant proprety are priced low 
+
+										QUESTION 3
+--Do properties sold as vacant tend to have larger acreage compared to non-vacant ones?
+		SELECT
+    AVG(CASE WHEN Soldasvacant = 'Yes' THEN acreage END) AS Avg_acreage_vacant,
+    AVG(CASE WHEN Soldasvacant = 'No' THEN acreage END) AS Avg_acreage_notvacant
+FROM Nashville_housing
+WHERE Soldasvacant IN ('Yes', 'No');
+
+ANSWER
+-- The properties sold as vacant have larger acreage compared to non vacant 
+	
+
+										SECTION 6
+
+
+-- Geographic Analysis
+SELECT * FROM Nashville_housing 
+									QUESTION 1
+--Can you visualize the distribution of property values across different regions on a map?
+
+
+									
+									QUESTION 2
+
+--Are there specific areas with significantly higher property values than others?
+
+
+
+									QUESTION 3
+
+-- How do property values vary in different tax districts?	
+
+SELECT taxdistrict,ROUND(AVG(totalvalue),2) AS totalvalue
+	FROM Nashville_housing
+		GROUP BY taxdistrict
+		ORDER BY totalvalue DESC
+
+
+									
+
+
+										SECTION 7
+
+
+SELECT * FROM nashville_housing 
+
+									QUESTION 1
+									
+-- Is there a trend in the average property value based on the year the property was built?
+
+SELECT yearbuilt,ROUND(AVG(totalvalue),2) AS totalvalue
+	FROM Nashville_housing
+		GROUP BY yearbuilt
+		ORDER BY totalvalue DESC
+
+
+									QUESTION 2
+									
+-- Which decade has the highest number of properties in the dataset?	
+ 
+	
+SELECT (yearbuilt/10)*10 as DECADE, COUNT(*) AS Property_count
+	FROM Nashville_housing
+	GROUP BY (yearbuilt/10)*10
+	ORDER BY Property_count DESC;
+	
+	
+SELECT (EXTRACT(DECADE FROM TO_DATE(yearbuilt::TEXT, 'YYYY'))*10) AS Decade, count(*) AS property_count
+FROM Nashville_housing
+GROUP BY Decade
+ORDER BY Decade;
+
+
+
+								QUESTION 3
+
+
+-- Can you identify any outliers in terms of property values for specific years?
+
+-- Hint - One common method to identify an outlier is using interquartile range(IQR)
+
+SELECT
+    yearbuilt,
+    percentile_cont(0.25) WITHIN GROUP (ORDER BY totalvalue) AS q1,
+    percentile_cont(0.75) WITHIN GROUP (ORDER BY totalvalue) AS q3
+FROM
+    Nashville_housing
+GROUP BY
+    yearbuilt
+ORDER BY
+    yearbuilt;
+
+
+--SUBTRACTING Q1 FROM Q3 to get the IQR 
+
+SELECT
+    yearbuilt,
+    q1,
+    q3,
+    q3 - q1 AS iqr
+FROM (SELECT
+    yearbuilt,
+    percentile_cont(0.25) WITHIN GROUP (ORDER BY totalvalue) AS q1,
+    percentile_cont(0.75) WITHIN GROUP (ORDER BY totalvalue) AS q3
+FROM
+    Nashville_housing
+GROUP BY
+    yearbuilt
+ORDER BY
+    yearbuilt
+   
+) AS quartiles;
+
+
+-- STEP 3 
+SELECT
+    nh.yearbuilt,
+    nh.totalvalue,
+    q1,
+    q3,
+    iqr
+FROM
+    Nashville_housing nh
+JOIN (
+  SELECT
+    yearbuilt,
+    q1,
+    q3,
+    q3 - q1 AS iqr
+FROM (SELECT
+    yearbuilt,
+    percentile_cont(0.25) WITHIN GROUP (ORDER BY totalvalue) AS q1,
+    percentile_cont(0.75) WITHIN GROUP (ORDER BY totalvalue) AS q3
+FROM
+    Nashville_housing
+GROUP BY
+    yearbuilt
+ORDER BY
+    yearbuilt
+   
+) AS quartiles ON nh.yearbuilt = quartiles.yearbuilt
+WHERE
+    nh.totalvalue < (q1 - 1.5 * iqr)
+    OR nh.totalvalue > (q3 + 1.5 * iqr)
+ORDER BY
+    nh.yearbuilt, nh.totalvalue;
+	
+	
+
+												SECTION 8
+
+
+SELECT * FROM Nashville_housing
+
+--Bedrooms and Bathrooms Analysis
+
+
+											QUESTION 1
+
+-- What is the average number of bedrooms and bathrooms for properties with different total values?
+
+SELECT
+    CASE
+        WHEN totalvalue < 100000 THEN 'Under $100,000'
+        WHEN totalvalue >= 100000 AND totalvalue < 200000 THEN '$100,000 - $199,999'
+        WHEN totalvalue >= 200000 AND totalvalue < 300000 THEN '$200,000 - $299,999'
+        ELSE 'Over $300,000'
+    END AS total_value_range,
+    ROUND(AVG(bedrooms),2) AS avg_bedrooms,
+    ROUND(AVG(fullbath),2) AS avg_bathrooms
+FROM
+    Nashville_housing
+GROUP BY
+    total_value_range
+ORDER BY
+    total_value_range;
+
+
+									QUESTION 2
+									
+									
+--Are properties with more bedrooms typically associated with higher sale prices?
+
+
+SELECT
+    ROUND(CAST(CORR(bedrooms, totalvalue)AS NUMERIC),2) AS correlation
+FROM
+    Nashville_housing;
+
+									QUESTION 3
+-- How does the presence of half baths affect property values?	
+
+SELECT 
+		ROUND(CAST(CORR(halfbath, totalvalue) as NUMERIC),2) AS CORRELATION
+	FROM
+		Nashville_housing 
+
+		ANSWER
+
+-- properties with half baths tend to have higher property values on average. 
+-- However, please keep in mind that correlation does not imply causation, 
+-- and other factors may also influence property values.
+
+
+
+										SECTION 9(Acreage and Property Value)
+SELECT * FROM Nashville_housing
+
+--					QUESTION 1 (Is there a relationship between the acreage of a property and its land value?)
+
+SELECT ROUND(CAST(CORR(acreage,landvalue)AS NUMERIC),2) as correlation
+	FROM Nashville_housing 											
+		
+													
+-- QUESTION 2(Are larger properties generally associated with higher building values?)	
+ 
+SELECT
+    CASE
+        WHEN acreage < 1 THEN 'Small'
+        WHEN acreage >= 1 AND acreage < 5 THEN 'Medium'
+        WHEN acreage >= 5 AND acreage < 10 THEN 'Large'
+        ELSE 'Very Large'
+    END AS size_range,
+    ROUND(AVG(buildingvalue),2) AS avg_building_value
+FROM
+    Nashville_housing
+GROUP BY
+    size_range
+ORDER BY
+    size_range;
+												
+													
+Question 3(Can you find any instances where properties with relatively small acreage have high total values?)												
+													
+											
+SELECT
+    MAX(Total_value) AS Max_Total_Value
+FROM (
+    SELECT
+        CASE
+            WHEN acreage < 1 THEN 'Small'
+            WHEN acreage >= 1 AND acreage < 5 THEN 'Medium'
+            WHEN acreage >= 5 AND acreage < 10 THEN 'Large'
+            ELSE 'Very Large'
+        END AS size_range,
+        ROUND(SUM(totalvalue), 2) AS Total_value
+    FROM
+        Nashville_housing
+    GROUP BY
+        size_range
+) AS S
+WHERE
+    size_range = 'Small';
+
+
+
+
+						SECTION 10(Property Assessment Accuracy)
+
+	SELECT * FROM Nashville_housing 												
+													
+
+-- QUESTION 1 - 	Is there a significant difference between the sum of land and building values and the total value?	
+
+WITH ValueDifferences AS (
+    SELECT      
+        (landvalue + buildingvalue) AS sum_values,
+        totalvalue
+    FROM
+        Nashville_Housing
+)
+SELECT
+    CASE
+        WHEN SUM(sum_values) = SUM(totalvalue) THEN 'No Significant Difference'
+        ELSE 'Significant Difference'
+    END AS result
+FROM
+    ValueDifferences;
+											OR 
+
+SELECT 
+	CASE
+		WHEN SUM(M.sum_value) =SUM(M.totalvalue)	THEN 'No significant difference'												
+		ELSE 'Significant Difference'
+		END AS result
+FROM													
+	(SELECT (landvalue + buildingvalue)	as SUM_VALUE,totalvalue
+		FROM Nashville_housing	)M												
+
+-- QUESTION 2	- Can you identify potential cases of incorrect assessment based on value discrepancies?
+	
+SELECT
+    Uniqueid,
+    landvalue,
+    buildingvalue,
+	(Landvalue + buildingvalue) sum_total,												
+    totalvalue,
+    CASE
+        WHEN (landvalue + buildingvalue) <> totalvalue THEN 'Incorrect Assessment'
+        ELSE 'Correct Assessment'
+    END AS assessment_status
+FROM
+    Nashville_housing;
+
+													
+-- QUESTION 3	- Are there any patterns in terms of properties where land and building values differ significantly from the total value?
+				
+SELECT 
+		Uniqueid,
+		Landvalue,
+		buildingvalue,
+		totalvalue,											
+		ABS((Landvalue + buildingvalue) - totalvalue) Signicant_difference,
+		CASE 
+			WHEN(Landvalue + buildingvalue)	<> totalvalue THEN 'significant difference'	
+			ELSE 'No significant difference'
+			END AS Patterns										
+FROM Nashville_housing 													
+
